@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  aws-sam-lambda-proxy-integration
+
+Globals:
+  Function:
+    Runtime: nodejs12.x
+    Timeout: 30
+    MemorySize: 256
+
+Resources:
+  LambdaRoleForRuleExecution:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-lambda-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: lambda.amazonaws.com
+      Policies:
+        - PolicyName: WriteCloudWatchLogs
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListAllMyBuckets
+                Resource: arn:aws:s3:::*
+
+  BucketList:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/
+      Handler: s3.bucketList
+      Role: !GetAtt LambdaRoleForRuleExecution.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /s3/buckets
+            Method: get
+
+  LambdaInfo:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/
+      Handler: index.lambdaInfo
+      Events:
+        LambdaInfoGet:
+          Type: Api
+          Properties:
+            Path: /lambda/info
+            Method: get
+        LambdaInfoGetId:
+          Type: Api
+          Properties:
+            Path: /lambda/info/{id}
+            Method: get
+        LambdaInfoPost:
+          Type: Api
+          Properties:
+            Path: /lambda/info
+            Method: post
+        ApiEventProxy:
+          Type: Api
+          Properties:
+            Path: /lambda/proxy/{proxy+}
+            Method: any
+
+  LambdaInfoPut:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/
+      Handler: index.lambdaInfo
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /lambda/info
+            Method: put
